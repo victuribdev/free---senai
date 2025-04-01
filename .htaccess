@@ -1,0 +1,41 @@
+# Ativar o motor de reescrita
+RewriteEngine On
+
+# Redirecionar todas as solicitações para o index.php
+# RewriteCond %{REQUEST_FILENAME} !-f
+# RewriteCond %{REQUEST_FILENAME} !-d
+# RewriteRule ^(.*)$ index.php [QSA,L]
+
+# Adicionar tipos MIME
+AddType application/x-httpd-php .php
+
+# Configurações para PHP
+<IfModule mod_php7.c>
+    php_flag display_errors On
+    php_value error_reporting E_ALL
+</IfModule>
+
+# Configurações para PHP8
+<IfModule mod_php8.c>
+    php_flag display_errors On
+    php_value error_reporting E_ALL
+</IfModule>
+
+# Permitir acesso a arquivos PHP na pasta api/
+<Directory "api">
+    Options +Indexes
+    AllowOverride All
+    Require all granted
+</Directory>
+
+# Permitir métodos HTTP
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+</IfModule>
+
+# Definir charset
+AddDefaultCharset UTF-8
+
+# Desativar indexação de diretórios
+Options -Indexes 
