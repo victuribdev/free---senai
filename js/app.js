@@ -21,9 +21,9 @@ const publicacoes = [
 ];
 
 let usuarioLogado = null;
-let likes = {};
-let dislikes = {};
-let comentarios = {};
+let likes = [];
+let dislikes = [];
+let comentarios = [];
 
 // Elementos do DOM
 const loginButton = document.getElementById('login-button');
@@ -59,14 +59,14 @@ function updateProfile() {
         logo.src = `Anexos/foto_usuario/${currentUser.foto}`;
         logo.alt = `Foto de ${currentUser.nome}`;
         companyName.textContent = currentUser.nickname;
-        totalLikes.textContent = '2';
-        totalDislikes.textContent = '1';
+        totalLikes.textContent = likes.filter(l => l.usuario_id === currentUser.id).length;
+        totalDislikes.textContent = dislikes.filter(d => d.usuario_id === currentUser.id).length;
     } else {
         logo.src = `Anexos/logo/${empresas[0].logo}`;
         logo.alt = 'Logo Sabor do Brasil';
         companyName.textContent = empresas[0].nome;
-        totalLikes.textContent = '12';
-        totalDislikes.textContent = '0';
+        totalLikes.textContent = likes.length;
+        totalDislikes.textContent = dislikes.length;
     }
 }
 
@@ -78,6 +78,10 @@ function renderPublications() {
         const publicationCard = document.createElement('div');
         publicationCard.className = 'publication-card';
         
+        const likesCount = likes.filter(l => l.publicacao_id === publication.id_publicacao).length;
+        const dislikesCount = dislikes.filter(d => d.publicacao_id === publication.id_publicacao).length;
+        const commentsCount = comentarios.filter(c => c.publicacao_id === publication.id_publicacao).length;
+        
         publicationCard.innerHTML = `
             <h3 class="publication-title">${publication.titulo_prato}</h3>
             <img src="Anexos/publicacao/${publication.foto}" alt="${publication.titulo_prato}" class="publication-image">
@@ -87,17 +91,17 @@ function renderPublications() {
                     <span>${publication.cidade}</span>
                 </div>
                 <div class="publication-actions">
-                    <div class="action-group">
+                    <div class="action-group like-button" data-publication-id="${publication.id_publicacao}">
                         <img src="Anexos/icones/flecha_cima_vazia.svg" alt="Like">
-                        <span>${Object.values(likes).filter(l => l.publicacao_id === publication.id_publicacao).length}</span>
+                        <span>${likesCount}</span>
                     </div>
-                    <div class="action-group">
+                    <div class="action-group dislike-button" data-publication-id="${publication.id_publicacao}">
                         <img src="Anexos/icones/flecha_baixo_vazia.svg" alt="Dislike">
-                        <span>${Object.values(dislikes).filter(d => d.publicacao_id === publication.id_publicacao).length}</span>
+                        <span>${dislikesCount}</span>
                     </div>
-                    <div class="action-group">
+                    <div class="action-group comment-button" data-publication-id="${publication.id_publicacao}">
                         <img src="Anexos/icones/chat.svg" alt="Comentar">
-                        <span>${Object.values(comentarios).filter(c => c.publicacao_id === publication.id_publicacao).length}</span>
+                        <span>${commentsCount}</span>
                     </div>
                 </div>
             </div>
@@ -106,14 +110,13 @@ function renderPublications() {
         publicationsContainer.appendChild(publicationCard);
         
         // Adicionar event listeners para os botões
-        const actions = publicationCard.querySelectorAll('.action-group');
-        actions.forEach(action => {
-            action.addEventListener('click', () => {
-                if (!currentUser) {
-                    showModal(loginModal);
-                }
-            });
-        });
+        const likeButton = publicationCard.querySelector('.like-button');
+        const dislikeButton = publicationCard.querySelector('.dislike-button');
+        const commentButton = publicationCard.querySelector('.comment-button');
+        
+        likeButton.addEventListener('click', () => handleLike(publication.id_publicacao));
+        dislikeButton.addEventListener('click', () => handleDislike(publication.id_publicacao));
+        commentButton.addEventListener('click', () => handleComment(publication.id_publicacao));
     });
 }
 
@@ -126,6 +129,25 @@ loginButton.addEventListener('click', () => {
         renderPublications();
     } else {
         showModal(loginModal);
+    }
+});
+
+loginForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const nickname = document.getElementById('nickname').value;
+    const senha = document.getElementById('senha').value;
+    
+    const usuario = usuarios.find(u => u.nickname === nickname && u.senha === senha);
+    
+    if (usuario) {
+        currentUser = usuario;
+        loginButton.textContent = 'Sair';
+        hideModal(loginModal);
+        loginForm.reset();
+        updateProfile();
+        renderPublications();
+    } else {
+        alert('Nickname ou senha incorretos!');
     }
 });
 
@@ -143,29 +165,6 @@ noDeleteButton.addEventListener('click', () => {
     hideModal(deleteModal);
 });
 
-// Função para renderizar comentários
-function renderComments(publicationId) {
-    const publicationComments = comentarios.filter(c => c.publicacao_id === publicationId);
-    return publicationComments.map(comment => `
-        <div class="comment" data-comment-id="${comment.id}">
-            <div class="comment-header">
-                <span class="comment-author">${usuarios.find(u => u.id === comment.usuario_id)?.nome}</span>
-                ${currentUser?.id === comment.usuario_id ? `
-                    <div class="comment-actions">
-                        <button class="edit-comment" data-comment-id="${comment.id}">
-                            <img src="Anexos/icones/lapis_editar.svg" alt="Editar">
-                        </button>
-                        <button class="delete-comment" data-comment-id="${comment.id}">
-                            <img src="Anexos/icones/lixeira_deletar.svg" alt="Excluir">
-                        </button>
-                    </div>
-                ` : ''}
-            </div>
-            <p class="comment-text">${comment.texto}</p>
-        </div>
-    `).join('');
-}
-
 // Função para lidar com likes
 function handleLike(publicationId) {
     if (!currentUser) {
@@ -173,27 +172,23 @@ function handleLike(publicationId) {
         return;
     }
     
-    const publication = publicacoes.find(p => p.id_publicacao === publicationId);
     const existingLike = likes.find(l => l.usuario_id === currentUser.id && l.publicacao_id === publicationId);
     const existingDislike = dislikes.find(d => d.usuario_id === currentUser.id && d.publicacao_id === publicationId);
     
     if (existingLike) {
         // Remove o like
-        delete likes[publicationId];
-        publication.likes_count--;
+        likes = likes.filter(l => !(l.usuario_id === currentUser.id && l.publicacao_id === publicationId));
     } else {
         // Adiciona o like
         if (existingDislike) {
             // Remove o dislike se existir
-            delete dislikes[publicationId];
-            publication.dislikes_count--;
+            dislikes = dislikes.filter(d => !(d.usuario_id === currentUser.id && d.publicacao_id === publicationId));
         }
-        likes[publicationId] = { usuario_id: currentUser.id, publicacao_id: publicationId };
-        publication.likes_count++;
+        likes.push({ usuario_id: currentUser.id, publicacao_id: publicationId });
     }
     
     renderPublications();
-    updateUserStats();
+    updateProfile();
 }
 
 // Função para lidar com dislikes
@@ -203,27 +198,23 @@ function handleDislike(publicationId) {
         return;
     }
     
-    const publication = publicacoes.find(p => p.id_publicacao === publicationId);
-    const existingDislike = dislikes.find(d => d.usuario_id === currentUser.id && d.publicacao_id === publicationId);
     const existingLike = likes.find(l => l.usuario_id === currentUser.id && l.publicacao_id === publicationId);
+    const existingDislike = dislikes.find(d => d.usuario_id === currentUser.id && d.publicacao_id === publicationId);
     
     if (existingDislike) {
         // Remove o dislike
-        delete dislikes[publicationId];
-        publication.dislikes_count--;
+        dislikes = dislikes.filter(d => !(d.usuario_id === currentUser.id && d.publicacao_id === publicationId));
     } else {
         // Adiciona o dislike
         if (existingLike) {
             // Remove o like se existir
-            delete likes[publicationId];
-            publication.likes_count--;
+            likes = likes.filter(l => !(l.usuario_id === currentUser.id && l.publicacao_id === publicationId));
         }
-        dislikes[publicationId] = { usuario_id: currentUser.id, publicacao_id: publicationId };
-        publication.dislikes_count++;
+        dislikes.push({ usuario_id: currentUser.id, publicacao_id: publicationId });
     }
     
     renderPublications();
-    updateUserStats();
+    updateProfile();
 }
 
 // Função para lidar com comentários
@@ -237,64 +228,23 @@ function handleComment(publicationId) {
     showModal(commentModal);
 }
 
-// Função para atualizar estatísticas do usuário
-function updateUserStats() {
-    if (!currentUser) {
-        document.getElementById('total-likes').textContent = '0';
-        document.getElementById('total-dislikes').textContent = '0';
-        return;
-    }
-    
-    const userLikes = Object.values(likes).filter(l => l.usuario_id === currentUser.id).length;
-    const userDislikes = Object.values(dislikes).filter(d => d.usuario_id === currentUser.id).length;
-    
-    document.getElementById('total-likes').textContent = userLikes;
-    document.getElementById('total-dislikes').textContent = userDislikes;
-}
-
-// Event listener para o formulário de login
-loginForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    
-    const nickname = document.getElementById('nickname').value;
-    const senha = document.getElementById('senha').value;
-    
-    const user = usuarios.find(u => u.nickname === nickname && u.senha === senha);
-    
-    if (user) {
-        currentUser = user;
-        loginButton.textContent = 'Sair';
-        hideModal(loginModal);
-        loginForm.reset();
-        updateProfile();
-        renderPublications();
-    } else {
-        document.getElementById('nickname').style.borderColor = '#FF0000';
-        document.getElementById('senha').style.borderColor = '#FF0000';
-    }
-});
-
-// Event listener para o formulário de comentário
 commentForm.addEventListener('submit', (e) => {
     e.preventDefault();
+    const commentText = document.getElementById('comment-text').value;
     
-    const texto = document.getElementById('comment-text').value;
-    
-    const newComment = {
-        id: Date.now(),
-        usuario_id: currentUser.id,
-        publicacao_id: currentPublication,
-        texto,
-        createdAt: new Date()
-    };
-    
-    comentarios[newComment.id] = newComment;
-    const publication = publicacoes.find(p => p.id_publicacao === currentPublication);
-    publication.comments_count++;
-    
-    hideModal(commentModal);
-    commentForm.reset();
-    renderPublications();
+    if (currentUser && currentPublication) {
+        const newComment = {
+            id: Date.now(),
+            usuario_id: currentUser.id,
+            publicacao_id: currentPublication,
+            texto: commentText
+        };
+        
+        comentarios.push(newComment);
+        hideModal(commentModal);
+        commentForm.reset();
+        renderPublications();
+    }
 });
 
 // Inicialização
