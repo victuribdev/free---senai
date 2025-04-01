@@ -50,29 +50,34 @@
         </div>
     </div>
 
+    <!-- Modal de Comentários -->
     <div id="comment-modal" class="modal">
         <div class="modal-content">
-            <h2>Adicionar Comentário</h2>
-            <form id="comment-form">
-                <div class="form-group">
-                    <label for="comment-text">Comentário:</label>
-                    <textarea id="comment-text" required></textarea>
-                </div>
-                <div class="modal-buttons">
-                    <button type="button" id="cancel-comment-button">Cancelar</button>
-                    <button type="submit" class="primary">Comentar</button>
+            <div class="modal-header">
+                <h2 class="modal-title">Adicionar Comentário</h2>
+                <button class="close-button" id="close-comment-modal">&times;</button>
+            </div>
+            <form id="comment-form" class="comment-form">
+                <textarea id="comment-text" class="comment-input" placeholder="Digite seu comentário aqui..."></textarea>
+                <div class="comment-buttons">
+                    <button type="button" class="comment-button cancel-button" id="cancel-comment-button">Cancelar</button>
+                    <button type="submit" class="comment-button save-button">Salvar</button>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- Modal de Confirmação de Exclusão -->
     <div id="delete-modal" class="modal">
         <div class="modal-content">
-            <h2>Excluir Comentário</h2>
-            <p>Deseja realmente excluir este comentário?</p>
-            <div class="modal-buttons">
-                <button id="no-delete-button">Não</button>
-                <button id="yes-delete-button">Sim</button>
+            <div class="modal-header">
+                <h2 class="modal-title">Confirmar Exclusão</h2>
+                <button class="close-button" id="no-delete-button">&times;</button>
+            </div>
+            <p>Tem certeza que deseja excluir este comentário?</p>
+            <div class="comment-buttons">
+                <button class="comment-button cancel-button" id="no-delete-button">Não</button>
+                <button class="comment-button save-button" id="yes-delete-button">Sim</button>
             </div>
         </div>
     </div>

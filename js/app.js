@@ -3,10 +3,7 @@ let currentUser = null;
 let currentPublication = null;
 let currentComment = null;
 
-// Configuração da API
-const API_URL = 'api';
-
-// Dados estáticos (como backup caso a API não esteja disponível)
+// Dados estáticos
 const usuarios = [
     { id: 1, nome: "usuario01", email: "usuario01@usuario.com", nickname: "usuario_01", senha: "123456", foto: "usuario_01.jpg" },
     { id: 2, nome: "usuario02", email: "usuario02@usuario.com", nickname: "usuario_02", senha: "654321", foto: "usuario_02.jpg" },
@@ -19,247 +16,165 @@ const empresas = [
 
 const publicacoes = [
     { id_publicacao: 1, foto: "publicacao01.png", titulo_prato: "Titulo do Prato 01", local: "Local 01", cidade: "Maceio-AL", empresa_id: 1 },
-    { id_publicacao: 2, foto: "publicacao02.png", titulo_prato: "Titulo do Prato 02", local: "Local 02", cidade: "Minas Gerais-MG", empresa_id: 1 },
-    { id_publicacao: 3, foto: "publicacao03.png", titulo_prato: "Titulo do Prato 03", local: "Local 03", cidade: "Rio de Janerio-RJ", empresa_id: 1 }
+    { id_publicacao: 2, foto: "publicacao02.png", titulo_prato: "Titulo do Prato 02", local: "Local 02", cidade: "Maceio-AL", empresa_id: 1 },
+    { id_publicacao: 3, foto: "publicacao03.png", titulo_prato: "Titulo do Prato 03", local: "Local 03", cidade: "Maceio-AL", empresa_id: 1 }
 ];
 
-// Arrays para armazenar dados da API
-let dadosPublicacoes = [];
-let likes = [];
-let dislikes = [];
-let comentarios = [];
-
-// Função para fazer requisições à API
-async function fetchAPI(endpoint, method = 'GET', data = null) {
-    try {
-        const options = {
-            method,
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        };
-        
-        if (data && (method === 'POST' || method === 'PUT' || method === 'DELETE')) {
-            options.body = JSON.stringify(data);
-        }
-        
-        const url = `${API_URL}/${endpoint}${method === 'GET' && data ? '?' + new URLSearchParams(data).toString() : ''}`;
-        const response = await fetch(url, options);
-        const result = await response.json();
-        
-        return result;
-    } catch (error) {
-        console.error('Erro na requisição:', error);
-        return { success: false, message: 'Erro na conexão com o servidor' };
+// Funções de armazenamento local
+const storage = {
+    getItem(key) {
+        return JSON.parse(localStorage.getItem(key) || '[]');
+    },
+    
+    setItem(key, value) {
+        localStorage.setItem(key, JSON.stringify(value));
     }
-}
+};
 
 // Função para carregar dados iniciais
-async function carregarDadosIniciais() {
-    try {
-        // Carregar publicações
-        const resultPublicacoes = await fetchAPI('publicacoes.php');
-        if (resultPublicacoes.success) {
-            dadosPublicacoes = resultPublicacoes.publicacoes;
-        } else {
-            // Usar dados estáticos se a API falhar
-            dadosPublicacoes = publicacoes;
+function carregarDadosIniciais() {
+    // Verificar se há um usuário já logado
+    const userStorage = localStorage.getItem('sabor_brasil_user');
+    if (userStorage) {
+        currentUser = JSON.parse(userStorage);
+        if (loginButton) {
+            loginButton.textContent = 'Sair';
         }
-        
-        // Carregar likes e dislikes
-        const resultLikesDislikes = await fetchAPI('likes.php');
-        if (resultLikesDislikes.success) {
-            likes = resultLikesDislikes.likes || [];
-            dislikes = resultLikesDislikes.dislikes || [];
-        }
-        
-        // Carregar comentários
-        const resultComentarios = await fetchAPI('comentarios.php');
-        if (resultComentarios.success) {
-            comentarios = resultComentarios.comentarios || [];
-        }
-        
-        // Verificar se há um usuário já logado
-        const userStorage = localStorage.getItem('sabor_brasil_user');
-        if (userStorage) {
-            currentUser = JSON.parse(userStorage);
-            if (loginButton) {
-                loginButton.textContent = 'Sair';
-            }
-        }
-        
-        // Atualizar a interface
-        updateProfile();
-        renderPublications();
-    } catch (error) {
-        console.error('Erro ao carregar dados iniciais:', error);
-        // Fallback para dados estáticos
-        dadosPublicacoes = publicacoes;
-        updateProfile();
-        renderPublications();
     }
+    
+    // Atualizar a interface
+    updateProfile();
+    renderPublications();
 }
 
-// Função para realizar login
-async function fazerLogin(nickname, senha) {
-    try {
-        const result = await fetchAPI('auth.php', 'POST', { nickname, senha });
-        
-        if (result.success) {
-            currentUser = result.usuario;
-            localStorage.setItem('sabor_brasil_user', JSON.stringify(currentUser));
-            return { success: true, usuario: currentUser };
-        } else {
-            return { success: false, message: result.message };
-        }
-    } catch (error) {
-        console.error('Erro no login:', error);
-        
-        // Fallback se a API falhar
-        const usuario = usuarios.find(u => u.nickname === nickname && u.senha === senha);
-        if (usuario) {
-            currentUser = usuario;
-            localStorage.setItem('sabor_brasil_user', JSON.stringify(currentUser));
-            return { success: true, usuario: currentUser };
-        }
-        
-        return { success: false, message: 'Erro na conexão com o servidor' };
+// Função de login
+function fazerLogin(nickname, senha) {
+    const usuario = usuarios.find(u => u.nickname === nickname && u.senha === senha);
+    if (usuario) {
+        currentUser = usuario;
+        localStorage.setItem('sabor_brasil_user', JSON.stringify(currentUser));
+        return true;
     }
+    return false;
+}
+
+// Função de logout
+function fazerLogout() {
+    currentUser = null;
+    currentPublication = null;
+    currentComment = null;
+    
+    // Limpar dados do localStorage
+    localStorage.removeItem('sabor_brasil_user');
+    localStorage.removeItem('likes');
+    localStorage.removeItem('dislikes');
+    localStorage.removeItem('comentarios');
+    
+    // Atualizar interface
+    loginButton.textContent = 'Entrar';
+    updateProfile();
+    renderPublications();
+    
+    // Limpar formulários
+    if (loginForm) loginForm.reset();
+    if (commentForm) commentForm.reset();
+    
+    // Fechar modais se estiverem abertos
+    hideModal(loginModal);
+    hideModal(commentModal);
+    hideModal(deleteModal);
 }
 
 // Função para gerenciar likes
-async function gerenciarLike(publicacaoId, acao = 'adicionar') {
+function gerenciarLike(publicacaoId, acao = 'adicionar') {
     if (!currentUser) return false;
     
-    try {
-        const result = await fetchAPI('likes.php', 'POST', {
-            usuario_id: currentUser.id,
-            publicacao_id: publicacaoId,
-            tipo: 'like',
-            acao
-        });
-        
-        if (result.success) {
-            // Atualizar dados locais
-            if (acao === 'adicionar') {
-                // Remover dislike se existir
-                dislikes = dislikes.filter(d => !(d.usuario_id === currentUser.id && d.publicacao_id === publicacaoId));
-                // Adicionar like
-                likes.push({ usuario_id: currentUser.id, publicacao_id: publicacaoId });
-            } else {
-                // Remover like
-                likes = likes.filter(l => !(l.usuario_id === currentUser.id && l.publicacao_id === publicacaoId));
-            }
-            return true;
-        }
-        return false;
-    } catch (error) {
-        console.error('Erro ao gerenciar like:', error);
-        return false;
+    let likes = storage.getItem('likes');
+    let dislikes = storage.getItem('dislikes');
+    
+    if (acao === 'adicionar') {
+        // Remover dislike se existir
+        dislikes = dislikes.filter(d => !(d.usuario_id === currentUser.id && d.publicacao_id === publicacaoId));
+        // Adicionar like
+        likes.push({ usuario_id: currentUser.id, publicacao_id: publicacaoId });
+    } else {
+        // Remover like
+        likes = likes.filter(l => !(l.usuario_id === currentUser.id && l.publicacao_id === publicacaoId));
     }
+    
+    storage.setItem('likes', likes);
+    storage.setItem('dislikes', dislikes);
+    return true;
 }
 
 // Função para gerenciar dislikes
-async function gerenciarDislike(publicacaoId, acao = 'adicionar') {
+function gerenciarDislike(publicacaoId, acao = 'adicionar') {
     if (!currentUser) return false;
     
-    try {
-        const result = await fetchAPI('likes.php', 'POST', {
-            usuario_id: currentUser.id,
-            publicacao_id: publicacaoId,
-            tipo: 'dislike',
-            acao
-        });
-        
-        if (result.success) {
-            // Atualizar dados locais
-            if (acao === 'adicionar') {
-                // Remover like se existir
-                likes = likes.filter(l => !(l.usuario_id === currentUser.id && l.publicacao_id === publicacaoId));
-                // Adicionar dislike
-                dislikes.push({ usuario_id: currentUser.id, publicacao_id: publicacaoId });
-            } else {
-                // Remover dislike
-                dislikes = dislikes.filter(d => !(d.usuario_id === currentUser.id && d.publicacao_id === publicacaoId));
-            }
-            return true;
-        }
-        return false;
-    } catch (error) {
-        console.error('Erro ao gerenciar dislike:', error);
-        return false;
+    let likes = storage.getItem('likes');
+    let dislikes = storage.getItem('dislikes');
+    
+    if (acao === 'adicionar') {
+        // Remover like se existir
+        likes = likes.filter(l => !(l.usuario_id === currentUser.id && l.publicacao_id === publicacaoId));
+        // Adicionar dislike
+        dislikes.push({ usuario_id: currentUser.id, publicacao_id: publicacaoId });
+    } else {
+        // Remover dislike
+        dislikes = dislikes.filter(d => !(d.usuario_id === currentUser.id && d.publicacao_id === publicacaoId));
     }
+    
+    storage.setItem('likes', likes);
+    storage.setItem('dislikes', dislikes);
+    return true;
 }
 
 // Função para adicionar comentário
-async function adicionarComentario(publicacaoId, texto) {
+function adicionarComentario(publicacaoId, texto) {
     if (!currentUser) return false;
     
-    try {
-        const result = await fetchAPI('comentarios.php', 'POST', {
-            usuario_id: currentUser.id,
-            publicacao_id: publicacaoId,
-            texto
-        });
-        
-        if (result.success) {
-            // Adicionar comentário local
-            comentarios.push(result.comentario);
-            return true;
-        }
-        return false;
-    } catch (error) {
-        console.error('Erro ao adicionar comentário:', error);
-        return false;
-    }
+    let comentarios = storage.getItem('comentarios');
+    const novoComentario = {
+        id: Date.now(),
+        usuario_id: currentUser.id,
+        publicacao_id: publicacaoId,
+        texto: texto,
+        nome: currentUser.nickname
+    };
+    
+    comentarios.push(novoComentario);
+    storage.setItem('comentarios', comentarios);
+    return true;
 }
 
 // Função para atualizar comentário
-async function atualizarComentario(comentarioId, texto) {
+function atualizarComentario(comentarioId, texto) {
     if (!currentUser) return false;
     
-    try {
-        const result = await fetchAPI('comentarios.php', 'PUT', {
-            id: comentarioId,
-            usuario_id: currentUser.id,
-            texto
-        });
-        
-        if (result.success) {
-            // Atualizar comentário local
-            const index = comentarios.findIndex(c => c.id === comentarioId);
-            if (index !== -1) {
-                comentarios[index].texto = texto;
-            }
-            return true;
-        }
-        return false;
-    } catch (error) {
-        console.error('Erro ao atualizar comentário:', error);
-        return false;
+    let comentarios = storage.getItem('comentarios');
+    const index = comentarios.findIndex(c => c.id === comentarioId);
+    
+    if (index !== -1 && comentarios[index].usuario_id === currentUser.id) {
+        comentarios[index].texto = texto;
+        storage.setItem('comentarios', comentarios);
+        return true;
     }
+    return false;
 }
 
 // Função para excluir comentário
-async function excluirComentario(comentarioId) {
+function excluirComentario(comentarioId) {
     if (!currentUser) return false;
     
-    try {
-        const result = await fetchAPI('comentarios.php', 'DELETE', {
-            id: comentarioId,
-            usuario_id: currentUser.id
-        });
-        
-        if (result.success) {
-            // Remover comentário local
-            comentarios = comentarios.filter(c => c.id !== comentarioId);
-            return true;
-        }
-        return false;
-    } catch (error) {
-        console.error('Erro ao excluir comentário:', error);
-        return false;
+    let comentarios = storage.getItem('comentarios');
+    const index = comentarios.findIndex(c => c.id === comentarioId);
+    
+    if (index !== -1 && comentarios[index].usuario_id === currentUser.id) {
+        comentarios.splice(index, 1);
+        storage.setItem('comentarios', comentarios);
+        return true;
     }
+    return false;
 }
 
 // Elementos do DOM
@@ -269,6 +184,7 @@ const loginForm = document.getElementById('login-form');
 const cancelButton = document.getElementById('cancel-button');
 const commentModal = document.getElementById('comment-modal');
 const commentForm = document.getElementById('comment-form');
+const closeCommentModal = document.getElementById('close-comment-modal');
 const cancelCommentButton = document.getElementById('cancel-comment-button');
 const deleteModal = document.getElementById('delete-modal');
 const noDeleteButton = document.getElementById('no-delete-button');
@@ -292,6 +208,9 @@ function updateProfile() {
     const totalLikes = document.getElementById('total-likes');
     const totalDislikes = document.getElementById('total-dislikes');
 
+    const likes = storage.getItem('likes');
+    const dislikes = storage.getItem('dislikes');
+
     if (currentUser) {
         logo.src = `Anexos/foto_usuario/${currentUser.foto}`;
         logo.alt = `Foto de ${currentUser.nome}`;
@@ -311,7 +230,11 @@ function updateProfile() {
 function renderPublications() {
     publicationsContainer.innerHTML = '';
     
-    dadosPublicacoes.forEach(publication => {
+    const likes = storage.getItem('likes');
+    const dislikes = storage.getItem('dislikes');
+    const comentarios = storage.getItem('comentarios');
+    
+    publicacoes.forEach(publication => {
         const publicationCard = document.createElement('div');
         publicationCard.className = 'publication-card';
         
@@ -332,11 +255,11 @@ function renderPublications() {
                     <span>${publication.cidade}</span>
                 </div>
                 <div class="publication-actions">
-                    <div class="action-group like-button" data-publication-id="${publication.id_publicacao}">
+                    <div class="action-group like-button ${userLiked ? 'active' : ''}" data-publication-id="${publication.id_publicacao}">
                         <img src="Anexos/icones/${userLiked ? 'flecha_cima_cheia.svg' : 'flecha_cima_vazia.svg'}" alt="Like">
                         <span>${likesCount}</span>
                     </div>
-                    <div class="action-group dislike-button" data-publication-id="${publication.id_publicacao}">
+                    <div class="action-group dislike-button ${userDisliked ? 'active' : ''}" data-publication-id="${publication.id_publicacao}">
                         <img src="Anexos/icones/${userDisliked ? 'flecha_baixo_cheia.svg' : 'flecha_baixo_vazia.svg'}" alt="Dislike">
                         <span>${dislikesCount}</span>
                     </div>
@@ -349,7 +272,7 @@ function renderPublications() {
             
             ${commentsCount > 0 ? `
                 <div class="publication-comments">
-                    <h4>Comentários</h4>
+                    <h4 class="comments-title">Comentários</h4>
                     ${renderComments(publication.id_publicacao)}
                 </div>
             ` : ''}
@@ -395,6 +318,7 @@ function renderPublications() {
 
 // Função para renderizar comentários
 function renderComments(publicationId) {
+    const comentarios = storage.getItem('comentarios');
     const publicationComments = comentarios.filter(c => c.publicacao_id == publicationId);
     return publicationComments.map(comment => {
         return `
@@ -421,31 +345,25 @@ function renderComments(publicationId) {
 // Event Listeners
 loginButton.addEventListener('click', () => {
     if (currentUser) {
-        currentUser = null;
-        localStorage.removeItem('sabor_brasil_user');
-        loginButton.textContent = 'Entrar';
-        updateProfile();
-        renderPublications();
+        fazerLogout();
     } else {
         showModal(loginModal);
     }
 });
 
-loginForm.addEventListener('submit', async (e) => {
+loginForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const nickname = document.getElementById('nickname').value;
     const senha = document.getElementById('senha').value;
     
-    const result = await fazerLogin(nickname, senha);
-    
-    if (result.success) {
+    if (fazerLogin(nickname, senha)) {
         loginButton.textContent = 'Sair';
         hideModal(loginModal);
         loginForm.reset();
         updateProfile();
         renderPublications();
     } else {
-        alert(result.message || 'Nickname ou senha incorretos!');
+        alert('Nickname ou senha incorretos!');
         document.getElementById('nickname').style.borderColor = '#FF0000';
         document.getElementById('senha').style.borderColor = '#FF0000';
     }
@@ -456,6 +374,12 @@ cancelButton.addEventListener('click', () => {
     loginForm.reset();
     document.getElementById('nickname').style.borderColor = '';
     document.getElementById('senha').style.borderColor = '';
+});
+
+closeCommentModal.addEventListener('click', () => {
+    hideModal(commentModal);
+    commentForm.reset();
+    currentComment = null;
 });
 
 cancelCommentButton.addEventListener('click', () => {
@@ -469,9 +393,9 @@ noDeleteButton.addEventListener('click', () => {
     currentComment = null;
 });
 
-yesDeleteButton.addEventListener('click', async () => {
+yesDeleteButton.addEventListener('click', () => {
     if (currentComment) {
-        const success = await excluirComentario(currentComment);
+        const success = excluirComentario(currentComment);
         if (success) {
             hideModal(deleteModal);
             renderPublications();
@@ -483,20 +407,21 @@ yesDeleteButton.addEventListener('click', async () => {
 });
 
 // Função para lidar com likes
-async function handleLike(publicationId) {
+function handleLike(publicationId) {
     if (!currentUser) {
         showModal(loginModal);
         return;
     }
     
+    const likes = storage.getItem('likes');
     const existingLike = likes.find(l => l.usuario_id == currentUser.id && l.publicacao_id == publicationId);
     
     if (existingLike) {
         // Remove o like
-        await gerenciarLike(publicationId, 'remover');
+        gerenciarLike(publicationId, 'remover');
     } else {
         // Adiciona o like
-        await gerenciarLike(publicationId, 'adicionar');
+        gerenciarLike(publicationId, 'adicionar');
     }
     
     renderPublications();
@@ -504,20 +429,21 @@ async function handleLike(publicationId) {
 }
 
 // Função para lidar com dislikes
-async function handleDislike(publicationId) {
+function handleDislike(publicationId) {
     if (!currentUser) {
         showModal(loginModal);
         return;
     }
     
+    const dislikes = storage.getItem('dislikes');
     const existingDislike = dislikes.find(d => d.usuario_id == currentUser.id && d.publicacao_id == publicationId);
     
     if (existingDislike) {
         // Remove o dislike
-        await gerenciarDislike(publicationId, 'remover');
+        gerenciarDislike(publicationId, 'remover');
     } else {
         // Adiciona o dislike
-        await gerenciarDislike(publicationId, 'adicionar');
+        gerenciarDislike(publicationId, 'adicionar');
     }
     
     renderPublications();
@@ -537,7 +463,7 @@ function handleComment(publicationId) {
     showModal(commentModal);
 }
 
-commentForm.addEventListener('submit', async (e) => {
+commentForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const commentText = document.getElementById('comment-text').value;
     
@@ -551,10 +477,10 @@ commentForm.addEventListener('submit', async (e) => {
         
         if (currentComment) {
             // Editar comentário existente
-            success = await atualizarComentario(currentComment, commentText);
+            success = atualizarComentario(currentComment, commentText);
         } else {
             // Adicionar novo comentário
-            success = await adicionarComentario(currentPublication, commentText);
+            success = adicionarComentario(currentPublication, commentText);
         }
         
         if (success) {
